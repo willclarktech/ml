@@ -1,13 +1,11 @@
 #!/usr/bin/env node
 const {
-	elementwiseAdd,
-	elementwiseMultiply,
-	elementwiseSubtract,
-	flatten,
-	matrixMultiply,
+	calculateError,
+	deltaCalculator,
+	forwardPropagator,
 	sigmoid,
 	sigmoidDerivative,
-	transpose,
+	updateSynapse,
 } = require("./utils");
 
 // prettier-ignore
@@ -26,32 +24,38 @@ const y = [
 	[1],
 ];
 
-const layer0 = X;
-let synapse0 = [...new Array(3)].map(() => [2 * Math.random() - 1]);
-let layer1;
-let layer1_error;
-let layer1_delta;
-let update;
-
 const iterations = process.env.ITERATIONS
 	? parseInt(process.env.ITERATIONS, 10)
 	: 100000;
 
-for (let i = 0; i < iterations; ++i) {
-	layer1 = matrixMultiply(layer0, synapse0).map(([n]) => [sigmoid(n)]);
-	layer1_error = elementwiseSubtract(y, flatten(layer1));
+const forwardPropagate = forwardPropagator(sigmoid);
+const calculateDelta = deltaCalculator(sigmoidDerivative);
 
-	if (process.env.DEBUG && i % (iterations / 10) === 0) {
-		console.info(layer1_error);
+const initialState = {
+	layer0: X,
+	synapse0: [...new Array(3)].map(() => [2 * Math.random() - 1]),
+	layer1: null,
+};
+
+const reducer = ({ layer0, synapse0 }, _, i) => {
+	const layer1 = forwardPropagate(layer0, synapse0);
+	const layer1Error = calculateError(y, layer1);
+
+	if (process.env.DEBUG && (i + 1) % (iterations / 10) === 0) {
+		console.info(`Error after ${i + 1} iterations:\n`, layer1Error);
 	}
 
-	layer1_delta = elementwiseMultiply(
-		layer1_error,
-		layer1.map(([n]) => [sigmoidDerivative(n)]),
-	);
-	update = matrixMultiply(transpose(layer0), layer1_delta.map(n => [n]));
-	synapse0 = synapse0.map((v, i) => elementwiseAdd(v, update[i]));
-}
+	const layer1Delta = calculateDelta(layer1, layer1Error);
+	const updatedSynapse = updateSynapse(layer0, synapse0, layer1Delta);
+
+	return {
+		layer0,
+		synapse0: updatedSynapse,
+		layer1,
+	};
+};
+
+const { layer1 } = [...new Array(iterations)].reduce(reducer, initialState);
 
 console.info("Output after training:");
 console.info(layer1);
@@ -62,5 +66,5 @@ console.info(layer1);
   0.9979917093392362,
   0.9975371365031968 ]
 
-	Time 0.677s
+	Time 0.924s
 */
