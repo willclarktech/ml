@@ -1,6 +1,9 @@
 import numpy as np
 import os
-from utils import forwardPropagate, sigmoid, sigmoid_derivative
+
+from utils import forward_propagate, generate_random_synapse, get_layer_width, sigmoid, sigmoid_derivative
+
+DEBUG = os.getenv("DEBUG") != None
 
 np.random.seed(1337)
 
@@ -28,13 +31,13 @@ y = np.array([
 
 layer0 = X
 hidden_width = 4
-synapse0 = 2 * np.random.random((len(X[0]), hidden_width)) - 1
-synapse1 = 2 * np.random.random((hidden_width, len(y[0]))) - 1
+synapse0 = generate_random_synapse(get_layer_width(X), hidden_width)
+synapse1 = generate_random_synapse(hidden_width, get_layer_width(y))
 
 iterations = int(os.getenv("ITERATIONS", "100000"))
 for i in range(iterations):
-    layer1 = forwardPropagate(layer0, synapse0, sigmoid)
-    layer2 = forwardPropagate(layer1, synapse1, sigmoid)
+    layer1 = forward_propagate(layer0, synapse0, sigmoid)
+    layer2 = forward_propagate(layer1, synapse1, sigmoid)
 
     layer2_error = y - layer2
     layer2_delta = layer2_error * sigmoid_derivative(layer2)
@@ -45,7 +48,7 @@ for i in range(iterations):
     synapse1 += np.dot(layer1.T, layer2_delta)
     synapse0 += np.dot(layer0.T, layer1_delta)
 
-    if (os.getenv("DEBUG") != None) & (i % (iterations/10) == 0):
+    if DEBUG & (i % (iterations/10) == 0):
         print("Error: ", layer2_error)
 
 
