@@ -3,7 +3,18 @@ module NeuralNetwork where
 import Data.List (foldl')
 import Text.Read (readMaybe)
 
-import NonLinearFunctions (NonLinearFunction, DerivativeFunction)
+import NonLinearFunctions
+    ( NonLinearFunction
+    , DerivativeFunction
+    , leakyRelu
+    , leakyReluDerivative
+    , relu
+    , reluDerivative
+    , sigmoid
+    , sigmoidDerivative
+    , softplus
+    , softplusDerivative
+    )
 import Utils
     ( chunk
     , deepMap
@@ -26,6 +37,17 @@ data Network = Network
     , layers :: [Layer]
     , synapses :: [Synapse]
     } deriving (Show)
+
+
+getActivationFns :: (NonLinearFunction, DerivativeFunction) -> Maybe String -> (NonLinearFunction, DerivativeFunction)
+getActivationFns defaultFns Nothing = defaultFns
+getActivationFns _ (Just str) =
+    case str of
+        "sigmoid" -> (sigmoid, sigmoidDerivative)
+        "relu" -> (relu, reluDerivative)
+        "leakyRelu" -> (leakyRelu, leakyReluDerivative)
+        "softplus" -> (softplus, softplusDerivative)
+        _ -> error "Unknown activation function"
 
 getIterations :: Int -> Maybe String -> Int
 getIterations defaultIterations Nothing = defaultIterations
@@ -117,8 +139,8 @@ updateSynapses synapses layers deltas =
     let zipped = zip3 synapses layers deltas
     in map (\(synapse, layer, delta) -> updateSynapse layer delta synapse) zipped
 
-trainOnce :: NonLinearFunction -> DerivativeFunction -> Network -> Network
-trainOnce nonLinearFn derivativeFn (Network expectedOutput (inputLayer:_) synapses) =
+trainOnce :: (NonLinearFunction, DerivativeFunction) -> Network -> Network
+trainOnce (nonLinearFn, derivativeFn) (Network expectedOutput (inputLayer:_) synapses) =
     let
         layers = propagateNetwork nonLinearFn inputLayer synapses
         deltas = backpropagateNetwork derivativeFn expectedOutput (tail layers) (tail synapses)
@@ -126,8 +148,8 @@ trainOnce nonLinearFn derivativeFn (Network expectedOutput (inputLayer:_) synaps
 
     in Network expectedOutput layers newSynapses
 
-train :: NonLinearFunction -> DerivativeFunction -> Int -> Network -> Network
-train _ _ 0 state = state
-train nonLinearFn derivativeFn n state =
-    let trainedOnce = trainOnce nonLinearFn derivativeFn state
-    in train nonLinearFn derivativeFn (n - 1) trainedOnce
+train :: (NonLinearFunction, DerivativeFunction) -> Int -> Network -> Network
+train _ 0 state = state
+train activationFns n state =
+    let trainedOnce = trainOnce activationFns state
+    in train activationFns (n - 1) trainedOnce
