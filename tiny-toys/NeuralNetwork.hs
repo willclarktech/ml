@@ -1,10 +1,16 @@
 module NeuralNetwork where
 
 import Data.List (foldl')
-import System.Random (mkStdGen, randomRs)
 import Text.Read (readMaybe)
 
 import NonLinearFunctions (NonLinearFunction, DerivativeFunction)
+import Utils
+    ( chunk
+    , deepMap
+    , flatten
+    , mkRandomStream
+    )
+
 
 type Vector = [Float]
 
@@ -21,7 +27,6 @@ data Network = Network
     , synapses :: [Synapse]
     } deriving (Show)
 
-
 getIterations :: Int -> Maybe String -> Int
 getIterations defaultIterations Nothing = defaultIterations
 getIterations defaultIterations (Just str) =
@@ -31,17 +36,6 @@ getIterations defaultIterations (Just str) =
 
 getLayerWidth :: Layer -> Int
 getLayerWidth = length . head
-
-mkRandomStream :: Int -> [Float]
-mkRandomStream seed =
-    let g = mkStdGen seed
-    in randomRs (-1.0, 1.0) g
-
-chunk :: Int -> [a] -> [[a]]
-chunk _ [] = []
-chunk size arr
-    | size > 0 = take size arr : chunk size (drop size arr)
-    | otherwise = error "Cannot chunk into chunks of size 0 or less"
 
 generateSynapses :: [Float] -> [Int] -> [Synapse]
 generateSynapses valueStream [] = []
@@ -58,12 +52,6 @@ generateRandomSynapses :: Int -> [Int] -> [Synapse]
 generateRandomSynapses seed widths =
     let randomStream = mkRandomStream seed
     in generateSynapses randomStream widths
-
-flatten :: [[a]] -> [a]
-flatten = foldr (++) []
-
-deepMap :: (a -> b) -> [[a]] -> [[b]]
-deepMap = map . map
 
 dotProduct :: Vector -> Vector -> Float
 dotProduct vector1 = sum . (zipWith (*) vector1)
