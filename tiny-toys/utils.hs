@@ -1,21 +1,11 @@
-module Utils
-    ( Network (..)
-    , calculateDelta
-    , calculateError
-    , calculateHiddenError
-    , forwardPropagate
-    , generateRandomSynapses
-    , getIterations
-    , getLayerWidth
-    , sigmoid
-    , sigmoidDerivative
-    , train
-    , updateSynapse
-    ) where
+module Utils where
 
-import System.Random (mkStdGen, randomRs, StdGen)
+import Data.List (foldl')
+import System.Random (mkStdGen, randomRs)
 import Text.Read (readMaybe)
 
+type NonLinearFunction = Float -> Float
+type DerivativeFunction = Float -> Float
 
 type Vector = [Float]
 
@@ -70,10 +60,10 @@ generateRandomSynapses seed widths =
     let randomStream = mkRandomStream seed
     in generateSynapses randomStream widths
 
-sigmoid :: Float -> Float
+sigmoid :: NonLinearFunction
 sigmoid n = 1 / (1 + exp (-n))
 
-sigmoidDerivative :: Float -> Float
+sigmoidDerivative :: DerivativeFunction
 sigmoidDerivative n = n * (1 - n)
 
 flatten :: [[a]] -> [a]
@@ -95,35 +85,68 @@ matrixMultiply matrix1 matrix2 =
     let transposedMatrix = transpose matrix2
     in map (\row -> map (dotProduct row) transposedMatrix) matrix1
 
-forwardPropagate :: (Float -> Float) -> Layer -> Synapse -> Layer
-forwardPropagate nonLinearFunction layer =
+propagateLayer :: NonLinearFunction -> Layer -> Synapse -> Layer
+propagateLayer nonLinearFunction layer =
     (deepMap nonLinearFunction) . (matrixMultiply layer)
 
-calculateError :: Layer -> Layer -> Error
-calculateError expected actual =
-    let chunkSize = getLayerWidth expected
-    in chunk chunkSize $ zipWith (-) (flatten expected) (flatten actual)
+
+propagateNetwork :: NonLinearFunction -> Layer -> [Synapse] -> [Layer]
+propagateNetwork nonLinearFunction inputLayer synapses =
+    foldl' (\layers synapse -> layers ++ [propagateLayer nonLinearFunction (last layers) synapse]) [inputLayer] synapses
+
+calculateOutputError :: Layer -> Layer -> Error
+calculateOutputError expected actual =
+    map (\(e, a) -> zipWith (-) e a) $ zip expected actual
 
 calculateHiddenError :: Delta -> Synapse -> Error
 calculateHiddenError delta synapse = matrixMultiply delta $ transpose synapse
 
-calculateDelta :: (Float -> Float) -> Layer -> Error -> Delta
+calculateDelta :: DerivativeFunction -> Layer -> Error -> Delta
 calculateDelta derivativeFunction layer err =
     let
         chunkSize = getLayerWidth layer
         derivatives = deepMap derivativeFunction layer
     in chunk chunkSize $ zipWith (*) (flatten err) (flatten derivatives)
 
+backpropagateLayer :: DerivativeFunction -> (Layer, Synapse) -> [Delta] -> [Delta]
+backpropagateLayer derivativeFunction (layer, synapse) deltas =
+    let
+        error = calculateHiddenError (head deltas) synapse
+        delta = calculateDelta derivativeFunction layer error
+    in delta:deltas
+
+backpropagateNetwork :: DerivativeFunction -> Layer -> [Layer] -> [Synapse] -> [Delta]
+backpropagateNetwork derivativeFunction expectedOutput layers synapses =
+    let
+        outputLayer = last layers
+        outputError = calculateOutputError expectedOutput outputLayer
+        outputDelta = calculateDelta derivativeFunction outputLayer outputError
+        zipped = zip layers synapses
+    in
+        foldr (backpropagateLayer derivativeFunction) [outputDelta] zipped
+
 calculateUpdate :: Layer -> Delta -> Update
-calculateUpdate layer =
-    let transposedLayer = transpose layer
-    in matrixMultiply transposedLayer
+calculateUpdate layer = matrixMultiply (transpose layer)
 
-updateSynapse :: Layer -> Synapse -> Delta -> Synapse
-updateSynapse layer delta =
-    let update = calculateUpdate layer delta
-    in zipWith (zipWith (+)) update
+updateSynapse :: Layer -> Delta -> Synapse -> Synapse
+updateSynapse layer delta = zipWith (zipWith (+)) $ calculateUpdate layer delta
 
-train :: (Network -> Network) -> Int -> Network -> Network
-train _ 0 state = state
-train trainOnce n state = train trainOnce (n - 1) $ trainOnce state
+updateSynapses :: [Synapse] -> [Layer] -> [Delta] -> [Synapse]
+updateSynapses synapses layers deltas =
+    let zipped = zip3 synapses layers deltas
+    in map (\(synapse, layer, delta) -> updateSynapse layer delta synapse) zipped
+
+trainOnce :: NonLinearFunction -> DerivativeFunction -> Network -> Network
+trainOnce nonLinearFn derivativeFn (Network expectedOutput (inputLayer:_) synapses) =
+    let
+        layers = propagateNetwork nonLinearFn inputLayer synapses
+        deltas = backpropagateNetwork derivativeFn expectedOutput (tail layers) (tail synapses)
+        newSynapses = updateSynapses synapses layers deltas
+
+    in Network expectedOutput layers newSynapses
+
+train :: NonLinearFunction -> DerivativeFunction -> Int -> Network -> Network
+train _ _ 0 state = state
+train nonLinearFn derivativeFn n state =
+    let trainedOnce = trainOnce nonLinearFn derivativeFn state
+    in train nonLinearFn derivativeFn (n - 1) trainedOnce
