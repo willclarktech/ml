@@ -1,27 +1,13 @@
 import System.Environment (lookupEnv)
 import Utils
     ( Network (..)
-    , calculateDelta
-    , calculateError
-    , forwardPropagate
     , generateRandomSynapses
     , getIterations
     , getLayerWidth
     , sigmoid
     , sigmoidDerivative
     , train
-    , updateSynapse
     )
-
-trainOnce :: Network -> Network
-trainOnce (Network expectedOutput (layer0:_) (synapse0:_)) =
-    let
-        layer1 = forwardPropagate sigmoid layer0 synapse0
-        layer1Error = calculateError expectedOutput layer1
-        layer1Delta = calculateDelta sigmoidDerivative layer1 layer1Error
-        updatedSynapse = updateSynapse layer0 layer1Delta synapse0
-    in
-        Network expectedOutput [layer0, layer1] [updatedSynapse]
 
 main = do
     envIterations <- lookupEnv "ITERATIONS"
@@ -34,7 +20,7 @@ main = do
     let initialSynapses = generateRandomSynapses 1337 widths
     let initialState = Network y [x] initialSynapses
 
-    let finalState = train trainOnce iterations initialState
+    let finalState = train sigmoid sigmoidDerivative iterations initialState
 
     print "Output after training:"
     print $ last $ layers finalState
