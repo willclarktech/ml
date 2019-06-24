@@ -1,11 +1,13 @@
 import System.Environment (lookupEnv)
-import Utils
+import NonLinearFunctions
+    ( sigmoid
+    , sigmoidDerivative
+    )
+import NeuralNetwork
     ( Network (..)
     , generateRandomSynapses
     , getIterations
     , getLayerWidth
-    , sigmoid
-    , sigmoidDerivative
     , train
     )
 

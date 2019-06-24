@@ -1,14 +1,14 @@
 haskell-tiny-toy:
 	mkdir -p build
-	ghc -O2 -o build/tiny-toy tiny-toy
+	ghc -O2 -o build/TinyToy TinyToy
 
 haskell-slightly-harder:
 	mkdir -p build
-	ghc -O2 -o build/slightly-harder slightly-harder
+	ghc -O2 -o build/SlightlyHarder SlightlyHarder
 
 haskell-three-way-xor:
 	mkdir -p build
-	ghc -O2 -o build/three-way-xor three-way-xor
+	ghc -O2 -o build/ThreeWayXor ThreeWayXor
 
 clean:
 	rm *.hi

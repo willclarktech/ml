@@ -1,11 +1,10 @@
-module Utils where
+module NeuralNetwork where
 
 import Data.List (foldl')
 import System.Random (mkStdGen, randomRs)
 import Text.Read (readMaybe)
 
-type NonLinearFunction = Float -> Float
-type DerivativeFunction = Float -> Float
+import NonLinearFunctions (NonLinearFunction, DerivativeFunction)
 
 type Vector = [Float]
 
@@ -59,12 +58,6 @@ generateRandomSynapses :: Int -> [Int] -> [Synapse]
 generateRandomSynapses seed widths =
     let randomStream = mkRandomStream seed
     in generateSynapses randomStream widths
-
-sigmoid :: NonLinearFunction
-sigmoid n = 1 / (1 + exp (-n))
-
-sigmoidDerivative :: DerivativeFunction
-sigmoidDerivative n = n * (1 - n)
 
 flatten :: [[a]] -> [a]
 flatten = foldr (++) []
